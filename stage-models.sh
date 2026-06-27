@@ -25,10 +25,29 @@ get()  { # get <url> <out> [auth-header]
   else                      wget -q --show-progress              -O "$2" "$1"; fi
 }
 
-# 1) Primary checkpoint — Juggernaut XL Ragnarok (~6.62 GB, CivitAI, auth required)
+# ── CHECKPOINT LIBRARY (uncensored SDXL) ────────────────────────────────────
+# All CivitAI version/file IDs API-verified 2026-06-27. Each ~6.6-6.8 GB fp16.
+# Stage the whole library (~27 GB) for per-character/style swapping, or comment
+# out the ones you don't want. Juggernaut = default photoreal; Pony = anime/
+# stylized (use score_9 prompts); RealVisXL = max photographic skin detail;
+# epiCRealism = diverse photoreal.
+AUTH="Authorization: Bearer $CIVITAI_API_KEY"
+
+# 1a) Juggernaut XL Ragnarok — DEFAULT photoreal (~6.62 GB)
 get "https://civitai.com/api/download/models/1759168?fileId=1659952" \
-    "$VOL/checkpoints/juggernautXL_ragnarok.safetensors" \
-    "Authorization: Bearer $CIVITAI_API_KEY"
+    "$VOL/checkpoints/juggernautXL_ragnarok.safetensors" "$AUTH"
+
+# 1b) Pony Diffusion V6 XL — anime/stylized, score_9 prompt family (~6.8 GB)
+get "https://civitai.com/api/download/models/290640?fileId=228616" \
+    "$VOL/checkpoints/ponyDiffusionV6XL.safetensors" "$AUTH"
+
+# 1c) RealVisXL V5.0 (Lightning, baked VAE) — most camera-like skin detail (~6.8 GB)
+get "https://civitai.com/api/download/models/798204?fileId=711904" \
+    "$VOL/checkpoints/realvisxlV50.safetensors" "$AUTH"
+
+# 1d) epiCRealism XL (pureFix) — diverse photoreal, strong prompt adherence (~6.8 GB)
+get "https://civitai.com/api/download/models/2514955?fileId=2402914" \
+    "$VOL/checkpoints/epicrealismXL.safetensors" "$AUTH"
 
 # 2) IP-Adapter FaceID PlusV2 SDXL (~1.49 GB) + its LoRA (~372 MB) — HF, no auth
 get "https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid-plusv2_sdxl.bin" \
@@ -54,7 +73,13 @@ echo ""
 echo "=== staged model tree ==="
 find "$VOL" -type f -printf '%10s  %p\n' 2>/dev/null | sort -k2
 echo ""
-# Fail loudly if the critical checkpoint is missing/short — the render can't run without it.
+# Report the checkpoint library; fail loudly only if the DEFAULT is missing.
+echo "=== checkpoint library ==="
+ls -lh "$VOL/checkpoints/" 2>/dev/null | awk 'NR>1{print "  "$9"  "$5}'
 CK="$VOL/checkpoints/juggernautXL_ragnarok.safetensors"
-if have "$CK"; then echo "✓ checkpoint present — staging OK. Delete this pod; the serverless endpoint will use the volume."
-else echo "✗ checkpoint MISSING/short — check CIVITAI_API_KEY and the CivitAI download URL."; exit 1; fi
+if have "$CK"; then
+  N=$(find "$VOL/checkpoints" -name '*.safetensors' -size +1M 2>/dev/null | wc -l)
+  echo "✓ default checkpoint present, $N checkpoint(s) staged — OK. Delete this pod; the serverless endpoint uses the volume."
+else
+  echo "✗ DEFAULT checkpoint (Juggernaut) MISSING/short — check CIVITAI_API_KEY and the download URL."; exit 1
+fi
